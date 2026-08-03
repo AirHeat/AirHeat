@@ -1,3 +1,10 @@
+# AirHeat v0.4.4 – Klientų ir Aptarnavimų skilčių pataisymas
+
+- Pataisyta būsena, dėl kurios Klientai ir Aptarnavimai galėjo neužsikrauti.
+- Mėnesio filtras pagal nutylėjimą yra „Visi mėnesiai“.
+- Rikiavimas pagal nutylėjimą: seniausi viršuje.
+- Išsaugotas ankstesnis Maps/Waze pataisymas ir klientų importas.
+
 # AirHeat v0.4.3 – pasirinktas mėnuo per visus metus
 
 - Galima pasirinkti konkretų mėnesį, pavyzdžiui, lapkritį.

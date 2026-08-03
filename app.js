@@ -10,7 +10,13 @@ const EQUIPMENT_PRESETS = [
 ];
 
 const state = {
-  view: 'dashboard', query: '', serviceFilter: 'all', selectedClientId: null, theme: savedTheme,
+  view: 'dashboard',
+  query: '',
+  serviceFilter: 'all',
+  selectedClientId: null,
+  selectedMonth: 'all',
+  clientSort: 'oldest',
+  theme: savedTheme,
   clients: savedClients || importedClients || [{
     id: crypto.randomUUID(), type: 'Fizinis asmuo', name: 'Jonas Jonaitis', phone: '+370 600 00000',
     email: 'jonas@example.lt', city: 'Vilnius', address: 'Pavyzdžio g. 1, Vilnius', latitude: 54.6872,
@@ -72,6 +78,11 @@ const MONTHS_LT=[
   ['04','Balandis'],['05','Gegužė'],['06','Birželis'],['07','Liepa'],
   ['08','Rugpjūtis'],['09','Rugsėjis'],['10','Spalis'],['11','Lapkritis'],['12','Gruodis']
 ];
+function ensureViewState(){
+  if(!state.selectedMonth) state.selectedMonth='all';
+  if(!state.clientSort) state.clientSort='oldest';
+  if(!state.serviceFilter) state.serviceFilter='all';
+}
 function migrate() {
   state.clients.forEach(c => {
     c.createdAt ||= today(); c.services ||= []; c.properties ||= []; c.address ||= c.properties[0]?.address || '';
@@ -129,7 +140,7 @@ function warrantyDots(c, compact=false) {
 }
 function dashboard(){
   const props=state.clients.flatMap(c=>c.properties||[]),eq=props.flatMap(p=>p.equipment||[]),due=allServices().filter(x=>x.service.status!=='completed').length;
-  return [header('Labas, Dariau 👋',`AirHeat v0.4.3 – importuota ${state.clients.filter(c=>c.importKey).length} Excel įrašų`,[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
+  return [header('Labas, Dariau 👋',`AirHeat v0.4.4 – importuota ${state.clients.filter(c=>c.importKey).length} Excel įrašų`,[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
     el('div',{class:'grid cols4'},[stat('Klientai',state.clients.length,'blue'),stat('Objektai',props.length,'orange'),stat('Įrenginiai',eq.length,'green'),stat('Laukia aptarnavimo',due,'red')]),
     el('div',{class:'card',style:'margin-top:16px'},[el('h3',{},'Aptarnavimų modulis'),el('div',{class:'muted'},'Geolokacija, Google Maps / Waze, įrangos pavadinimas ir visa garantinio laikotarpio metinių aptarnavimų istorija.'),el('div',{class:'actions',style:'margin-top:12px'},[el('button',{class:'btn btn-primary',onclick:()=>{state.view='services';render();}},'📅 Atidaryti aptarnavimus')])])];
 }
@@ -221,4 +232,4 @@ function openService(clientId){const c=state.clients.find(x=>x.id===clientId);co
 function openProperty(clientId){const f=el('form',{class:'form-grid'},[field('Objekto pavadinimas','name','text',false,'Namas, butas, biuras...'),field('Adresas','address','text',true),...locationFields()]);modal('Naujas objektas',f,()=>{const d=Object.fromEntries(new FormData(f));if(!d.address.trim())return alert('Įrašyk objekto adresą arba naudok dabartinę vietą.');state.clients.find(c=>c.id===clientId).properties.push({id:crypto.randomUUID(),name:d.name.trim()||'Objektas',address:d.address.trim(),latitude:Number(d.latitude)||null,longitude:Number(d.longitude)||null,equipment:[]});save();render();return true;});}
 function openEquipment(clientId,propertyId){const f=el('form',{class:'form-grid'},[select('Įrangos tipas','type',['Dujinis katilas','Šilumos siurblys','Rekuperatorius','Kondicionierius','Boileris','Cirkuliacinis siurblys','Vandens filtras','Kita'],true),field('Gamintojas','manufacturer'),field('Modelis','model'),field('Serijos numeris','serialNumber','text',true),field('Sumontavimo data','installedAt','date'),field('Garantija iki','warrantyUntil','date')]);modal('Pridėti įrangą',f,()=>{const d=Object.fromEntries(new FormData(f));if(!d.model.trim()&&!d.manufacturer.trim())return alert('Įrašyk gamintoją arba modelį.');const c=state.clients.find(x=>x.id===clientId);c.properties.find(p=>p.id===propertyId).equipment.push({id:crypto.randomUUID(),...d});c.equipmentName ||= `${d.manufacturer} ${d.model}`.trim();save();render();return true;});}
 function render(){applyTheme();const content=state.view==='dashboard'?dashboard():state.view==='clients'?clients():state.view==='services'?servicesView():state.view==='properties'?properties():equipment();shell(content);}
-mergeImportedClients();migrate();if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));render();
+ensureViewState();mergeImportedClients();migrate();if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));render();

@@ -16,3 +16,5 @@
 .service-table.wide .service-row{grid-template-columns:1.25fr 1.35fr 1.45fr 1fr 1.7fr}.service-row small{display:block;color:var(--muted);margin-top:4px}.service-row strong{display:block}.location-box{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:12px}.location-status{font-size:12px}.map-mini{padding:9px 11px}.client-service-card{align-items:start}
 @media(max-width:1100px){.service-table.wide .service-row{grid-template-columns:1.1fr 1.2fr 1.3fr 1fr 1.4fr}}
 @media(max-width:900px){.service-table.wide .service-row{grid-template-columns:1fr}.warranty-dots{margin:8px 0}.year-dot{width:34px;height:34px}}
+
+.date-line{margin-top:8px;font-weight:750;color:var(--orange);font-size:14px;}

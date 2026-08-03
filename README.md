@@ -1,3 +1,15 @@
+# AirHeat v0.4.2 – rikiavimas pagal datą
+
+- Klientai rikiuojami pagal paleidimo datą.
+- Galima pasirinkti naujausius arba seniausius viršuje.
+- Paleidimo data matoma prie kiekvieno kliento.
+- Aptarnavimo datos rodomos lietuvišku formatu.
+
+# AirHeat v0.4.1 – Maps pataisymas
+
+Pataisyta klaida, kai klientams be GPS koordinačių Maps/Waze gaudavo `null,null`.
+Dabar, jei GPS nėra, navigacijai naudojamas pilnas adresas.
+
 # AirHeat v0.4 – klientų importas
 
 Importuota iš `Paleidimai.xlsx`, pagrindinio lapo `PALEIDIMAI`.

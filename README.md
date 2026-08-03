@@ -1,3 +1,11 @@
+# AirHeat v0.4.3 – pasirinktas mėnuo per visus metus
+
+- Galima pasirinkti konkretų mėnesį, pavyzdžiui, lapkritį.
+- Rodomi visi to mėnesio įrašai per visus metus.
+- Rikiuojama pilna data, pavyzdžiui: 2018-11-10, 2018-11-21, 2019-11-13 ir t. t.
+- Galima pasirinkti seniausius arba naujausius viršuje.
+- Tas pats mėnesio filtras pridėtas ir Aptarnavimų skiltyje.
+
 # AirHeat v0.4.2 – rikiavimas pagal datą
 
 - Klientai rikiuojami pagal paleidimo datą.

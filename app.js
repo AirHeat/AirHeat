@@ -61,6 +61,17 @@ function formatDateLt(value){
 function clientDate(c){
   return c.commissioningDate || c.createdAt || ((c.services||[]).map(s=>s.date).filter(Boolean).sort()[0]) || '1900-01-01';
 }
+function monthNumber(value){
+  if(!value) return '';
+  const date=new Date(value+'T12:00:00');
+  if(Number.isNaN(date.getTime())) return '';
+  return String(date.getMonth()+1).padStart(2,'0');
+}
+const MONTHS_LT=[
+  ['all','Visi mėnesiai'],['01','Sausis'],['02','Vasaris'],['03','Kovas'],
+  ['04','Balandis'],['05','Gegužė'],['06','Birželis'],['07','Liepa'],
+  ['08','Rugpjūtis'],['09','Rugsėjis'],['10','Spalis'],['11','Lapkritis'],['12','Gruodis']
+];
 function migrate() {
   state.clients.forEach(c => {
     c.createdAt ||= today(); c.services ||= []; c.properties ||= []; c.address ||= c.properties[0]?.address || '';
@@ -118,43 +129,69 @@ function warrantyDots(c, compact=false) {
 }
 function dashboard(){
   const props=state.clients.flatMap(c=>c.properties||[]),eq=props.flatMap(p=>p.equipment||[]),due=allServices().filter(x=>x.service.status!=='completed').length;
-  return [header('Labas, Dariau 👋',`AirHeat v0.4.2 – importuota ${state.clients.filter(c=>c.importKey).length} Excel įrašų`,[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
+  return [header('Labas, Dariau 👋',`AirHeat v0.4.3 – importuota ${state.clients.filter(c=>c.importKey).length} Excel įrašų`,[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
     el('div',{class:'grid cols4'},[stat('Klientai',state.clients.length,'blue'),stat('Objektai',props.length,'orange'),stat('Įrenginiai',eq.length,'green'),stat('Laukia aptarnavimo',due,'red')]),
     el('div',{class:'card',style:'margin-top:16px'},[el('h3',{},'Aptarnavimų modulis'),el('div',{class:'muted'},'Geolokacija, Google Maps / Waze, įrangos pavadinimas ir visa garantinio laikotarpio metinių aptarnavimų istorija.'),el('div',{class:'actions',style:'margin-top:12px'},[el('button',{class:'btn btn-primary',onclick:()=>{state.view='services';render();}},'📅 Atidaryti aptarnavimus')])])];
 }
 function matches(c,q){return [c.name,c.phone,c.email,c.city,c.address,c.notes,c.equipmentName,...(c.properties||[]).flatMap(p=>[p.name,p.address,...(p.equipment||[]).flatMap(e=>[e.type,e.manufacturer,e.model,e.serialNumber])])].join(' ').toLowerCase().includes(q.toLowerCase());}
-function clients(){if(state.selectedClientId)return clientDetail();const visible=state.clients.filter(c=>matches(c,state.query)).sort((a,b)=>state.clientSort==='oldest'?clientDate(a).localeCompare(clientDate(b)):clientDate(b).localeCompare(clientDate(a)));return [header('Klientai','Visi klientai išrikiuoti pagal paleidimo datą',[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),el('div',{class:'toolbar'},[el('input',{class:'search',placeholder:'Ieškoti pagal klientą, adresą ar įrangą...',value:state.query,oninput:e=>{state.query=e.target.value;render();}}),el('select',{class:'btn',onchange:e=>{state.clientSort=e.target.value;render();}},[el('option',{value:'newest',selected:state.clientSort==='newest'?'selected':null},'Naujausi viršuje'),el('option',{value:'oldest',selected:state.clientSort==='oldest'?'selected':null},'Seniausi viršuje')])]),visible.length?el('div',{class:'list'},visible.map(clientRow)):el('div',{class:'empty'},'Klientų nerasta.')];}
-function clientRow(c){const last=latestCompleted(c),next=nextPlanned(c);return el('div',{class:'list-item client-service-card'},[
-  el('div',{onclick:()=>{state.selectedClientId=c.id;render();}},[el('div',{class:'list-title'},c.name),el('div',{class:'list-meta'},`${c.phone||'Nėra telefono'} · ${c.address||c.city||'Adresas nenurodytas'}`),el('div',{class:'date-line'},`📅 Paleidimo data: ${formatDateLt(clientDate(c))}`),el('div',{class:'equipment-name'},`🔥 ${c.equipmentName||firstEquipmentName(c)||'Įranga nenurodyta'}`),warrantyDots(c,true),el('div',{class:'tags'},[last?el('span',{class:'tag tag-done'},`Paskutinis: ${formatDateLt(last.date)}`):el('span',{class:'tag tag-alert'},'Dar neaptarnauta'),next?el('span',{class:'tag tag-next'},`Suplanuota: ${formatDateLt(next.date)}`):null])]),
-  el('div',{class:'actions'},[c.phone?el('a',{class:'btn',href:`tel:${c.phone}`},'📞'):null,mapButton(c,'Google'),mapButton(c,'Waze'),el('button',{class:'btn',onclick:()=>openService(c.id)},'➕ Aptarnavimas'),el('button',{class:'btn',onclick:()=>{state.selectedClientId=c.id;render();}},'Atidaryti')])
-]);}
-function mapUrl(c, provider){
-  const hasCoordinates =
-    c.latitude !== null &&
-    c.latitude !== undefined &&
-    c.latitude !== '' &&
-    c.longitude !== null &&
-    c.longitude !== undefined &&
-    c.longitude !== '' &&
-    Number.isFinite(Number(c.latitude)) &&
-    Number.isFinite(Number(c.longitude));
+function clients(){
+  if(state.selectedClientId)return clientDetail();
 
-  const address = String(c.address || c.city || '').trim();
-  const target = hasCoordinates
-    ? `${Number(c.latitude)},${Number(c.longitude)}`
-    : encodeURIComponent(address);
+  const visible=state.clients
+    .filter(c=>matches(c,state.query))
+    .filter(c=>state.selectedMonth==='all'||monthNumber(clientDate(c))===state.selectedMonth)
+    .sort((a,b)=>state.clientSort==='newest'
+      ? clientDate(b).localeCompare(clientDate(a))
+      : clientDate(a).localeCompare(clientDate(b)));
 
-  return provider === 'Waze'
-    ? `https://waze.com/ul?q=${target}&navigate=yes`
-    : `https://www.google.com/maps/dir/?api=1&destination=${target}`;
+  return [
+    header('Klientai','Pasirink mėnesį ir matysi visų metų klientus chronologine tvarka',[
+      el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')
+    ]),
+    el('div',{class:'toolbar'},[
+      el('input',{
+        class:'search',
+        placeholder:'Ieškoti pagal klientą, adresą ar įrangą...',
+        value:state.query,
+        oninput:e=>{state.query=e.target.value;render();}
+      }),
+      el('select',{
+        class:'btn',
+        onchange:e=>{state.selectedMonth=e.target.value;render();}
+      },MONTHS_LT.map(([value,label])=>el('option',{
+        value,
+        selected:state.selectedMonth===value?'selected':null
+      },label))),
+      el('select',{
+        class:'btn',
+        onchange:e=>{state.clientSort=e.target.value;render();}
+      },[
+        el('option',{value:'oldest',selected:state.clientSort==='oldest'?'selected':null},'Seniausi viršuje'),
+        el('option',{value:'newest',selected:state.clientSort==='newest'?'selected':null},'Naujausi viršuje')
+      ])
+    ]),
+    visible.length
+      ? el('div',{class:'list'},visible.map(clientRow))
+      : el('div',{class:'empty'},'Pagal pasirinktą mėnesį klientų nerasta.')
+  ];
 }
 function mapButton(c,provider){if(!c.address&&!c.latitude)return null;return el('a',{class:'btn map-mini',href:mapUrl(c,provider),target:'_blank',rel:'noopener'},provider==='Waze'?'Waze':'Maps');}
 function servicesView(){
-  let clients=[...state.clients]; if(state.serviceFilter==='pending')clients=clients.filter(c=>serviceYearStatus(c,currentWarrantyYear(c))==='due'||nextPlanned(c));if(state.serviceFilter==='overdue')clients=clients.filter(c=>Array.from({length:c.warrantyYears||5},(_,i)=>serviceYearStatus(c,i+1)).includes('missed'));if(state.serviceFilter==='completed')clients=clients.filter(c=>latestCompleted(c));
-  clients.sort((a,b)=>(nextRelevantDate(a)||'9999').localeCompare(nextRelevantDate(b)||'9999'));
-  return [header('Aptarnavimai','Kiekvienam klientui matomi visi garantijos metai ir aptarnavimo būsena',[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
+  let clients=[...state.clients];
+  if(state.serviceFilter==='pending')clients=clients.filter(c=>serviceYearStatus(c,currentWarrantyYear(c))==='due'||nextPlanned(c));
+  if(state.serviceFilter==='overdue')clients=clients.filter(c=>Array.from({length:c.warrantyYears||5},(_,i)=>serviceYearStatus(c,i+1)).includes('missed'));
+  if(state.serviceFilter==='completed')clients=clients.filter(c=>latestCompleted(c));
+  clients=clients.filter(c=>state.selectedMonth==='all'||monthNumber(clientDate(c))===state.selectedMonth);
+  clients.sort((a,b)=>clientDate(a).localeCompare(clientDate(b)));
+  return [header('Aptarnavimai','Pasirink mėnesį – matysi to mėnesio klientus per visus metus',[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
     el('div',{class:'legend'},[el('span',{},[el('i',{class:'legend-dot done'}),' Atlikta']),el('span',{},[el('i',{class:'legend-dot missed'}),' Neatlikta']),el('span',{},[el('i',{class:'legend-dot due'}),' Reikia atlikti']),el('span',{},[el('i',{class:'legend-dot future'}),' Ateityje'])]),
-    el('div',{class:'toolbar filterbar'},[filterButton('Visi','all'),filterButton('Laukia','pending'),filterButton('Praleisti','overdue'),filterButton('Turintys istoriją','completed')]),
+    el('div',{class:'toolbar filterbar'},[
+  el('select',{class:'btn',onchange:e=>{state.selectedMonth=e.target.value;render();}},
+    MONTHS_LT.map(([value,label])=>el('option',{value,selected:state.selectedMonth===value?'selected':null},label))
+  ),
+  filterButton('Visi','all'),filterButton('Laukia','pending'),
+  filterButton('Praleisti','overdue'),filterButton('Turintys istoriją','completed')
+]),
     clients.length?el('div',{class:'service-table wide'},[el('div',{class:'service-row service-head'},['Klientas / įranga','Adresas','Garantijos aptarnavimai','Paskutinis / kitas','Veiksmai'].map(x=>el('div',{},x))),...clients.map(serviceClientRow)]):el('div',{class:'empty'},'Pagal pasirinktą filtrą klientų nėra.')];
 }
 function currentWarrantyYear(c){const start=new Date((c.commissioningDate||c.createdAt)+'T12:00:00'),now=new Date();return Math.max(1,Math.min(c.warrantyYears||5,now.getFullYear()-start.getFullYear()+1));}

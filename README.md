@@ -1,14 +1,13 @@
-# AirHeat v0.2
+# AirHeat v0.3
 
-Nauja:
-- Šviesi tema pagal nutylėjimą ir temos perjungimas
-- Pilnas kliento adresas kuriant klientą
-- Automatinis pagrindinio objekto sukūrimas iš adreso
-- Atskira „Aptarnavimai“ skiltis
-- Sąrašas pagal datą
-- Filtrai: visi, laukiantys, vėluojantys, atlikti
-- Aptarnavimo pažymėjimas atliktu
-- Kliento aptarnavimo istorija
-- Klientai be aptarnavimo įrašo
+Aptarnavimų modulis:
 
-Duomenys vis dar saugomi tik naršyklėje. Supabase bus prijungta kitame etape.
+- pilnas adresas ir geolokacija;
+- dabartinės vietos nuskaitymas telefone;
+- Google Maps ir Waze navigacija;
+- šilumos siurblio / dujinio katilo pavadinimas pasirenkamas iš sąrašo arba įrašomas ranka;
+- 2–10 metų garantijos laikotarpis;
+- kiekvienų garantijos metų burbuliukai: žalia – atlikta, raudona – praleista, oranžinė – reikia atlikti, pilka – ateityje;
+- aptarnavimo istorija ir planuojami aptarnavimai.
+
+Duomenys šioje prototipo versijoje saugomi naršyklėje.

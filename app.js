@@ -1,5 +1,7 @@
 const savedClients = JSON.parse(localStorage.getItem('airheat_clients') || 'null');
 const savedTheme = localStorage.getItem('airheat_theme') || 'light';
+const importedClients = Array.isArray(window.AIRHEAT_IMPORTED_CLIENTS) ? window.AIRHEAT_IMPORTED_CLIENTS : [];
+const importVersion = window.AIRHEAT_IMPORT_VERSION || '';
 
 const EQUIPMENT_PRESETS = [
   'BAXI Luna Platinum', 'BAXI Luna Duo-tec', 'BAXI Duo-tec Compact', 'BAXI Nuvola Platinum',
@@ -9,7 +11,7 @@ const EQUIPMENT_PRESETS = [
 
 const state = {
   view: 'dashboard', query: '', serviceFilter: 'all', selectedClientId: null, theme: savedTheme,
-  clients: savedClients || [{
+  clients: savedClients || importedClients || [{
     id: crypto.randomUUID(), type: 'Fizinis asmuo', name: 'Jonas Jonaitis', phone: '+370 600 00000',
     email: 'jonas@example.lt', city: 'Vilnius', address: 'Pavyzdžio g. 1, Vilnius', latitude: 54.6872,
     longitude: 25.2797, notes: 'Pavyzdinis klientas', createdAt: '2026-07-01', commissioningDate: '2026-07-01',
@@ -20,13 +22,41 @@ const state = {
   }]
 };
 
+
+function mergeImportedClients() {
+  if (!importVersion || !importedClients.length) return;
+  if (localStorage.getItem('airheat_import_version') === importVersion) return;
+
+  const existingKeys = new Set(
+    state.clients.map(client => client.importKey).filter(Boolean)
+  );
+  let added = 0;
+
+  importedClients.forEach(client => {
+    if (!existingKeys.has(client.importKey)) {
+      state.clients.push(client);
+      existingKeys.add(client.importKey);
+      added += 1;
+    }
+  });
+
+  localStorage.setItem('airheat_import_version', importVersion);
+  save();
+
+  if (added > 0) {
+    setTimeout(() => {
+      alert(`Importuota klientų / įrangos įrašų: ${added}`);
+    }, 250);
+  }
+}
+
 function today() { return new Date().toISOString().slice(0, 10); }
 function save() { localStorage.setItem('airheat_clients', JSON.stringify(state.clients)); }
 function migrate() {
   state.clients.forEach(c => {
     c.createdAt ||= today(); c.services ||= []; c.properties ||= []; c.address ||= c.properties[0]?.address || '';
     c.commissioningDate ||= c.createdAt; c.warrantyYears = Number(c.warrantyYears || 5);
-    c.equipmentName ||= firstEquipmentName(c) || '';
+    c.equipmentName ||= firstEquipmentName(c) || ''; c.warrantyStatus ||= 'active';
     c.services.forEach(s => { s.equipmentName ||= c.equipmentName || firstEquipmentName(c) || s.type || 'Įranga'; s.serviceKind ||= s.type || 'Metinis aptarnavimas'; });
   });
   save();
@@ -59,13 +89,15 @@ const stat=(label,value,color='')=>el('div',{class:'card'},[el('div',{class:'mut
 function toggleTheme(){state.theme=state.theme==='light'?'dark':'light';applyTheme();render();}
 function allServices(){return state.clients.flatMap(client=>(client.services||[]).map(service=>({client,service})));}
 function latestCompleted(c){return (c.services||[]).filter(s=>s.status==='completed'&&s.serviceKind!=='Paleidimas').sort((a,b)=>b.date.localeCompare(a.date))[0];}
-function nextPlanned(c){return (c.services||[]).filter(s=>s.status!=='completed'&&s.date>=today()).sort((a,b)=>a.date.localeCompare(b.date))[0];}
+function nextPlanned(c){return (c.services||[]).filter(s=>s.status==='pending'&&s.date>=today()).sort((a,b)=>a.date.localeCompare(b.date))[0];}
 function yearsBetween(start, years){const d=new Date(start+'T12:00:00');d.setFullYear(d.getFullYear()+years);return d.toISOString().slice(0,10);}
 function serviceYearStatus(c, yearNo) {
   const start=c.commissioningDate||c.createdAt; if(!start) return 'unknown';
   const periodStart=yearsBetween(start,yearNo-1), periodEnd=yearsBetween(start,yearNo);
-  const done=(c.services||[]).some(s=>s.status==='completed'&&s.serviceKind!=='Paleidimas'&&s.date>=periodStart&&s.date<periodEnd);
-  if(done) return 'done'; if(today()>=periodEnd) return 'missed'; if(today()>=periodStart) return 'due'; return 'future';
+  const periodServices=(c.services||[]).filter(s=>s.serviceKind!=='Paleidimas'&&s.date>=periodStart&&s.date<periodEnd);
+  if(periodServices.some(s=>s.status==='completed')) return 'done';
+  if(periodServices.some(s=>s.status==='missed')) return 'missed';
+  if(today()>=periodEnd) return 'missed'; if(today()>=periodStart) return 'due'; return 'future';
 }
 function warrantyDots(c, compact=false) {
   const years=Math.max(1,Math.min(10,Number(c.warrantyYears||5)));
@@ -77,7 +109,7 @@ function warrantyDots(c, compact=false) {
 }
 function dashboard(){
   const props=state.clients.flatMap(c=>c.properties||[]),eq=props.flatMap(p=>p.equipment||[]),due=allServices().filter(x=>x.service.status!=='completed').length;
-  return [header('Labas, Dariau 👋','AirHeat v0.3 – pilna aptarnavimų kontrolė',[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
+  return [header('Labas, Dariau 👋',`AirHeat v0.4 – importuota ${state.clients.filter(c=>c.importKey).length} Excel įrašų`,[el('button',{class:'btn btn-primary',onclick:openClient},'➕ Naujas klientas')]),
     el('div',{class:'grid cols4'},[stat('Klientai',state.clients.length,'blue'),stat('Objektai',props.length,'orange'),stat('Įrenginiai',eq.length,'green'),stat('Laukia aptarnavimo',due,'red')]),
     el('div',{class:'card',style:'margin-top:16px'},[el('h3',{},'Aptarnavimų modulis'),el('div',{class:'muted'},'Geolokacija, Google Maps / Waze, įrangos pavadinimas ir visa garantinio laikotarpio metinių aptarnavimų istorija.'),el('div',{class:'actions',style:'margin-top:12px'},[el('button',{class:'btn btn-primary',onclick:()=>{state.view='services';render();}},'📅 Atidaryti aptarnavimus')])])];
 }
@@ -124,4 +156,4 @@ function openService(clientId){const c=state.clients.find(x=>x.id===clientId);co
 function openProperty(clientId){const f=el('form',{class:'form-grid'},[field('Objekto pavadinimas','name','text',false,'Namas, butas, biuras...'),field('Adresas','address','text',true),...locationFields()]);modal('Naujas objektas',f,()=>{const d=Object.fromEntries(new FormData(f));if(!d.address.trim())return alert('Įrašyk objekto adresą arba naudok dabartinę vietą.');state.clients.find(c=>c.id===clientId).properties.push({id:crypto.randomUUID(),name:d.name.trim()||'Objektas',address:d.address.trim(),latitude:Number(d.latitude)||null,longitude:Number(d.longitude)||null,equipment:[]});save();render();return true;});}
 function openEquipment(clientId,propertyId){const f=el('form',{class:'form-grid'},[select('Įrangos tipas','type',['Dujinis katilas','Šilumos siurblys','Rekuperatorius','Kondicionierius','Boileris','Cirkuliacinis siurblys','Vandens filtras','Kita'],true),field('Gamintojas','manufacturer'),field('Modelis','model'),field('Serijos numeris','serialNumber','text',true),field('Sumontavimo data','installedAt','date'),field('Garantija iki','warrantyUntil','date')]);modal('Pridėti įrangą',f,()=>{const d=Object.fromEntries(new FormData(f));if(!d.model.trim()&&!d.manufacturer.trim())return alert('Įrašyk gamintoją arba modelį.');const c=state.clients.find(x=>x.id===clientId);c.properties.find(p=>p.id===propertyId).equipment.push({id:crypto.randomUUID(),...d});c.equipmentName ||= `${d.manufacturer} ${d.model}`.trim();save();render();return true;});}
 function render(){applyTheme();const content=state.view==='dashboard'?dashboard():state.view==='clients'?clients():state.view==='services'?servicesView():state.view==='properties'?properties():equipment();shell(content);}
-migrate();if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));render();
+mergeImportedClients();migrate();if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));render();

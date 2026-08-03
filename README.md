@@ -1,13 +1,18 @@
-# AirHeat v0.3
+# AirHeat v0.4 – klientų importas
 
-Aptarnavimų modulis:
+Importuota iš `Paleidimai.xlsx`, pagrindinio lapo `PALEIDIMAI`.
 
-- pilnas adresas ir geolokacija;
-- dabartinės vietos nuskaitymas telefone;
-- Google Maps ir Waze navigacija;
-- šilumos siurblio / dujinio katilo pavadinimas pasirenkamas iš sąrašo arba įrašomas ranka;
-- 2–10 metų garantijos laikotarpis;
-- kiekvienų garantijos metų burbuliukai: žalia – atlikta, raudona – praleista, oranžinė – reikia atlikti, pilka – ateityje;
-- aptarnavimo istorija ir planuojami aptarnavimai.
+- Klientų / sumontuotos įrangos įrašų: **1095**
+- Aptarnavimo ir paleidimo istorijos įrašų: **3617**
+- Aktyvi garantija: **609**
+- 2 metų garantija: **152**
+- Atsisakė garantijos: **3**
+- Garantija pasibaigusi: **331**
 
-Duomenys šioje prototipo versijoje saugomi naršyklėje.
+## Įkėlimas į GitHub
+
+Išarchyvuok ZIP ir į GitHub įkelk visus failus, pakeisdamas senus.
+Svarbus naujas failas: `clients-data.js`.
+
+Pirmą kartą atidarius programą, duomenys bus sujungti su jau naršyklėje esančiais įrašais.
+Pakartotinai tie patys Excel įrašai nebus dubliuojami.

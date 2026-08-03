@@ -1,24 +1,14 @@
-# AirHeat v0.1
+# AirHeat v0.2
 
-Pirmas veikiantis AirHeat prototipas.
+Nauja:
+- Šviesi tema pagal nutylėjimą ir temos perjungimas
+- Pilnas kliento adresas kuriant klientą
+- Automatinis pagrindinio objekto sukūrimas iš adreso
+- Atskira „Aptarnavimai“ skiltis
+- Sąrašas pagal datą
+- Filtrai: visi, laukiantys, vėluojantys, atlikti
+- Aptarnavimo pažymėjimas atliktu
+- Kliento aptarnavimo istorija
+- Klientai be aptarnavimo įrašo
 
-## Jau veikia
-- Tamsi, telefonui ir kompiuteriui pritaikyta sąsaja
-- Klientų registras ir paieška
-- Keli objektai vienam klientui
-- Įrangos registras
-- Serijos, montavimo ir garantijos datos
-- Skambinimo ir navigacijos mygtukai
-- Duomenų saugojimas naršyklėje
-- PWA ir offline bazė
-
-## Paleidimas
-Išarchyvuok ZIP, terminale atidaryk aplanką ir paleisk:
-
-```bash
-python3 -m http.server 8080
-```
-
-Tada naršyklėje atidaryk `http://localhost:8080`.
-
-Svarbu: ši versija duomenis saugo tik toje naršyklėje. Kitame etape prijungsime Supabase, prisijungimą ir dokumentus.
+Duomenys vis dar saugomi tik naršyklėje. Supabase bus prijungta kitame etape.

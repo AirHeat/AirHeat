@@ -1,5 +1,34 @@
-const savedClients = JSON.parse(localStorage.getItem('airheat_clients') || 'null');
-const savedTheme = localStorage.getItem('airheat_theme') || 'light';
+let storageWarning = '';
+let clientStorageInvalid = false;
+function readStorage(key, fallback = null, parseJson = false) {
+  try {
+    const value = localStorage.getItem(key);
+    if (value === null) return fallback;
+    return parseJson ? JSON.parse(value) : value;
+  } catch (error) {
+    if (key === 'airheat_clients') clientStorageInvalid = true;
+    storageWarning = 'Naršyklėje išsaugoti duomenys yra sugadinti arba nepasiekiami. Rodomi importuoti duomenys; vietiniai pakeitimai nebuvo perrašyti.';
+    console.error(`Nepavyko perskaityti ${key} iš localStorage:`, error);
+    return fallback;
+  }
+}
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    storageWarning = 'Nepavyko išsaugoti pakeitimų šioje naršyklėje. Patikrink naršyklės saugyklą ir laisvą vietą.';
+    console.error(`Nepavyko įrašyti ${key} į localStorage:`, error);
+    return false;
+  }
+}
+const storedClients = readStorage('airheat_clients', null, true);
+const savedClients = Array.isArray(storedClients) ? storedClients : null;
+if (storedClients !== null && !Array.isArray(storedClients)) {
+  clientStorageInvalid = true;
+  storageWarning = 'Naršyklėje išsaugoti klientų duomenys yra netinkamo formato. Rodomi importuoti duomenys; vietiniai duomenys nebuvo perrašyti.';
+}
+const savedTheme = readStorage('airheat_theme', 'light');
 const importedClients = Array.isArray(window.AIRHEAT_IMPORTED_CLIENTS) ? window.AIRHEAT_IMPORTED_CLIENTS : [];
 const importVersion = window.AIRHEAT_IMPORT_VERSION || '';
 
@@ -31,7 +60,7 @@ const state = {
 
 function mergeImportedClients() {
   if (!importVersion || !importedClients.length) return;
-  if (localStorage.getItem('airheat_import_version') === importVersion) return;
+  if (readStorage('airheat_import_version', '') === importVersion) return;
 
   const existingKeys = new Set(
     state.clients.map(client => client.importKey).filter(Boolean)
@@ -46,7 +75,7 @@ function mergeImportedClients() {
     }
   });
 
-  localStorage.setItem('airheat_import_version', importVersion);
+  writeStorage('airheat_import_version', importVersion);
   save();
 
   if (added > 0) {
@@ -57,7 +86,10 @@ function mergeImportedClients() {
 }
 
 function today() { return new Date().toISOString().slice(0, 10); }
-function save() { localStorage.setItem('airheat_clients', JSON.stringify(state.clients)); }
+function save() {
+  if (clientStorageInvalid) return false;
+  return writeStorage('airheat_clients', JSON.stringify(state.clients));
+}
 function formatDateLt(value){
   if(!value) return 'Data nenurodyta';
   const date=new Date(value);
@@ -96,7 +128,7 @@ function firstEquipmentName(c) {
   const e = (c.properties || []).flatMap(p => p.equipment || [])[0];
   return e ? `${e.manufacturer || ''} ${e.model || ''}`.trim() : '';
 }
-function applyTheme() { document.documentElement.dataset.theme = state.theme; localStorage.setItem('airheat_theme', state.theme); }
+function applyTheme() { document.documentElement.dataset.theme = state.theme; writeStorage('airheat_theme', state.theme); }
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   Object.entries(attrs).forEach(([k,v]) => { if (k === 'class') node.className = v; else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v); else if (v !== null && v !== undefined) node.setAttribute(k,v); });
@@ -111,7 +143,7 @@ function shell(content) {
       el('div',{class:'brand'},[el('div',{class:'brand-mark'},'A'),el('div',{},[el('div',{class:'brand-title'},'AIRHEAT'),el('div',{class:'brand-sub'},'ŠVOK valdymo sistema')])]),
       el('nav',{class:'nav'},[nav('Pagrindinis','dashboard','🏠'),nav('Klientai','clients','👥'),nav('Aptarnavimai','services','📅'),nav('Objektai','properties','🏡'),nav('Įranga','equipment','🔧')])
     ]),
-    el('main',{class:'main'},content),
+    el('main',{class:'main'},[storageWarning?el('div',{class:'error-banner',role:'alert'},storageWarning):null,...content]),
     el('nav',{class:'mobile-nav'},[nav('Pradžia','dashboard','🏠'),nav('Klientai','clients','👥'),nav('Aptarn.','services','📅'),nav('Objektai','properties','🏡'),nav('Įranga','equipment','🔧')])
   ]));
 }
@@ -145,6 +177,39 @@ function dashboard(){
     el('div',{class:'card',style:'margin-top:16px'},[el('h3',{},'Aptarnavimų modulis'),el('div',{class:'muted'},'Geolokacija, Google Maps / Waze, įrangos pavadinimas ir visa garantinio laikotarpio metinių aptarnavimų istorija.'),el('div',{class:'actions',style:'margin-top:12px'},[el('button',{class:'btn btn-primary',onclick:()=>{state.view='services';render();}},'📅 Atidaryti aptarnavimus')])])];
 }
 function matches(c,q){return [c.name,c.phone,c.email,c.city,c.address,c.notes,c.equipmentName,...(c.properties||[]).flatMap(p=>[p.name,p.address,...(p.equipment||[]).flatMap(e=>[e.type,e.manufacturer,e.model,e.serialNumber])])].join(' ').toLowerCase().includes(q.toLowerCase());}
+function clientRow(c){return el('div',{class:'list-item'},[
+  el('div',{},[
+    el('div',{class:'list-title'},c.name||'Klientas be pavadinimo'),
+    el('div',{class:'list-meta'},[c.phone,c.address||c.city].filter(Boolean).join(' · ')||'Kontaktai nenurodyti'),
+    el('div',{class:'date-line'},`Paleidimas: ${formatDateLt(clientDate(c))}`),
+    el('div',{class:'equipment-name'},`🔥 ${c.equipmentName||firstEquipmentName(c)||'Įranga nenurodyta'}`),
+    warrantyDots(c,true)
+  ]),
+  el('div',{class:'actions'},[
+    c.phone?el('a',{class:'btn',href:`tel:${c.phone}`},'📞 Skambinti'):null,
+    mapButton(c,'Google'),
+    mapButton(c,'Waze'),
+    el('button',{class:'btn btn-primary',onclick:()=>{state.selectedClientId=c.id;render();}},'Atidaryti')
+  ])
+]);}
+function validCoordinates(item){
+  const latitude=Number(item?.latitude),longitude=Number(item?.longitude);
+  return item?.latitude!==null&&item?.latitude!==''&&item?.latitude!==undefined&&item?.longitude!==null&&item?.longitude!==''&&item?.longitude!==undefined&&Number.isFinite(latitude)&&Number.isFinite(longitude)&&latitude>=-90&&latitude<=90&&longitude>=-180&&longitude<=180;
+}
+function mapUrl(item,provider){
+  const hasCoordinates=validCoordinates(item);
+  const destination=hasCoordinates?`${Number(item.latitude)},${Number(item.longitude)}`:String(item?.address||'').trim();
+  if(!destination)return '';
+  const params=new URLSearchParams();
+  if(provider==='Waze'){
+    params.set(hasCoordinates?'ll':'q',destination);
+    params.set('navigate','yes');
+    return `https://www.waze.com/ul?${params.toString()}`;
+  }
+  params.set('api','1');
+  params.set('query',destination);
+  return `https://www.google.com/maps/search/?${params.toString()}`;
+}
 function clients(){
   if(state.selectedClientId)return clientDetail();
 
@@ -186,7 +251,7 @@ function clients(){
       : el('div',{class:'empty'},'Pagal pasirinktą mėnesį klientų nerasta.')
   ];
 }
-function mapButton(c,provider){if(!c.address&&!c.latitude)return null;return el('a',{class:'btn map-mini',href:mapUrl(c,provider),target:'_blank',rel:'noopener'},provider==='Waze'?'Waze':'Maps');}
+function mapButton(c,provider){const url=mapUrl(c,provider);if(!url)return null;return el('a',{class:'btn map-mini',href:url,target:'_blank',rel:'noopener'},provider==='Waze'?'Waze':'Maps');}
 function servicesView(){
   let clients=[...state.clients];
   if(state.serviceFilter==='pending')clients=clients.filter(c=>serviceYearStatus(c,currentWarrantyYear(c))==='due'||nextPlanned(c));
@@ -218,7 +283,7 @@ function filterButton(label,value){return el('button',{class:`btn ${state.servic
 function clientDetail(){const c=state.clients.find(x=>x.id===state.selectedClientId);return [el('button',{class:'btn',onclick:()=>{state.selectedClientId=null;render();}},'← Atgal'),el('div',{class:'card',style:'margin-top:14px'},[el('div',{class:'detail-head'},[el('div',{},[el('div',{class:'detail-title'},c.name),el('div',{class:'muted',style:'margin-top:6px'},`${c.phone||''}${c.email?' · '+c.email:''}`),el('div',{class:'muted',style:'margin-top:4px'},c.address||c.city||''),el('div',{class:'equipment-name'},`🔥 ${c.equipmentName||firstEquipmentName(c)||'Įranga nenurodyta'}`),warrantyDots(c)]),el('div',{class:'actions'},[c.phone?el('a',{class:'btn',href:`tel:${c.phone}`},'📞 Skambinti'):null,mapButton(c,'Google'),mapButton(c,'Waze'),el('button',{class:'btn btn-primary',onclick:()=>openService(c.id)},'➕ Aptarnavimas'),el('button',{class:'btn',onclick:()=>openProperty(c.id)},'➕ Objektas')])]),c.notes?el('p',{class:'muted'},c.notes):null]),
   el('h2',{class:'section-title'},'Aptarnavimo istorija'),(c.services||[]).length?el('div',{class:'list'},[...c.services].sort((a,b)=>b.date.localeCompare(a.date)).map(s=>el('div',{class:'list-item'},[el('div',{},[el('div',{class:'list-title'},`${formatDateLt(s.date)} · ${s.equipmentName||c.equipmentName}`),el('div',{class:'list-meta'},`${s.serviceKind||'Aptarnavimas'} · ${s.notes||''}`)]),el('div',{},s.status==='completed'?'✅':'⏳')]))):el('div',{class:'empty'},'Aptarnavimo įrašų dar nėra.'),
   el('h2',{class:'section-title'},'Objektai'),(c.properties||[]).length?el('div',{class:'list'},c.properties.map(p=>propertyCard(c,p))):el('div',{class:'empty'},'Šis klientas dar neturi objektų.')];}
-function propertyCard(c,p){return el('div',{class:'card'},[el('div',{class:'detail-head'},[el('div',{},[el('div',{class:'list-title'},p.name||'Objektas'),el('div',{class:'list-meta'},p.address||'Adresas nenurodytas')]),el('div',{class:'actions'},[(p.address||p.latitude!==null)?el('a',{class:'btn',href:mapUrl(p,'Google'),target:'_blank',rel:'noopener'},'🧭 Maps'):null,el('button',{class:'btn',onclick:()=>openEquipment(c.id,p.id)},'➕ Įranga')])]),el('div',{class:'tags'},(p.equipment||[]).map(e=>el('span',{class:'tag'},`${e.type}: ${e.manufacturer||''} ${e.model||''}`.trim()))),(p.equipment||[]).length?null:el('div',{class:'muted',style:'margin-top:10px'},'Įrangos dar nėra.')]);}
+function propertyCard(c,p){return el('div',{class:'card'},[el('div',{class:'detail-head'},[el('div',{},[el('div',{class:'list-title'},p.name||'Objektas'),el('div',{class:'list-meta'},p.address||'Adresas nenurodytas')]),el('div',{class:'actions'},[mapButton(p,'Google'),el('button',{class:'btn',onclick:()=>openEquipment(c.id,p.id)},'➕ Įranga')])]),el('div',{class:'tags'},(p.equipment||[]).map(e=>el('span',{class:'tag'},`${e.type}: ${e.manufacturer||''} ${e.model||''}`.trim()))),(p.equipment||[]).length?null:el('div',{class:'muted',style:'margin-top:10px'},'Įrangos dar nėra.')]);}
 function properties(){const rows=state.clients.flatMap(c=>(c.properties||[]).map(p=>({c,p})));return [header('Objektai','Visi klientų objektai'),rows.length?el('div',{class:'list'},rows.map(({c,p})=>el('div',{class:'list-item'},[el('div',{},[el('div',{class:'list-title'},p.name||'Objektas'),el('div',{class:'list-meta'},`${p.address||'Adresas nenurodytas'} · ${c.name}`)]),el('button',{class:'btn',onclick:()=>{state.view='clients';state.selectedClientId=c.id;render();}},'Atidaryti')]))):el('div',{class:'empty'},'Objektų dar nėra.')];}
 function equipment(){const rows=state.clients.flatMap(c=>(c.properties||[]).flatMap(p=>(p.equipment||[]).map(e=>({c,p,e}))));return [header('Įranga','Visa sumontuota įranga viename registre'),rows.length?el('div',{class:'list'},rows.map(({c,p,e})=>el('div',{class:'list-item'},[el('div',{},[el('div',{class:'list-title'},`${e.manufacturer||''} ${e.model||''}`.trim()||e.type),el('div',{class:'list-meta'},`${e.type} · ${p.address} · ${c.name}`)]),el('button',{class:'btn',onclick:()=>{state.view='clients';state.selectedClientId=c.id;render();}},'Objektas')]))):el('div',{class:'empty'},'Įrangos dar nėra.')];}
 function modal(title,body,onSave){const backdrop=el('div',{class:'modal-backdrop'}),box=el('div',{class:'modal'}),close=()=>backdrop.remove();box.append(el('div',{class:'modal-header'},[el('h2',{},title),el('button',{class:'close',onclick:close},'×')]),body,el('div',{class:'modal-footer'},[el('button',{class:'btn',onclick:close},'Atšaukti'),el('button',{class:'btn btn-primary',onclick:()=>{if(onSave())close();}},'Išsaugoti')]));backdrop.append(box);document.body.append(backdrop);}
@@ -231,5 +296,26 @@ function openClient(){const f=el('form',{class:'form-grid'},[select('Kliento tip
 function openService(clientId){const c=state.clients.find(x=>x.id===clientId);const f=el('form',{class:'form-grid'},[field('Aptarnavimo data','date','date',false,'',today()),equipmentInput('Aptarnaujamas įrenginys',c.equipmentName||firstEquipmentName(c)),select('Darbo tipas','serviceKind',['Metinis aptarnavimas','Paleidimas','Garantinis remontas','Gedimas','Profilaktika','Kita']),select('Būsena','status',['Atlikta','Suplanuota']),field('Pastabos / atlikti darbai','notes','text',true)]);modal('Aptarnavimo įrašas',f,()=>{const d=Object.fromEntries(new FormData(f));if(!d.date)return alert('Pasirink datą.');if(!d.equipmentName.trim())return alert('Įrašyk įrangos pavadinimą.');c.services.push({id:crypto.randomUUID(),date:d.date,equipmentName:d.equipmentName.trim(),serviceKind:d.serviceKind,status:d.status==='Atlikta'?'completed':'pending',notes:d.notes.trim()});c.equipmentName ||= d.equipmentName.trim();save();render();return true;});}
 function openProperty(clientId){const f=el('form',{class:'form-grid'},[field('Objekto pavadinimas','name','text',false,'Namas, butas, biuras...'),field('Adresas','address','text',true),...locationFields()]);modal('Naujas objektas',f,()=>{const d=Object.fromEntries(new FormData(f));if(!d.address.trim())return alert('Įrašyk objekto adresą arba naudok dabartinę vietą.');state.clients.find(c=>c.id===clientId).properties.push({id:crypto.randomUUID(),name:d.name.trim()||'Objektas',address:d.address.trim(),latitude:Number(d.latitude)||null,longitude:Number(d.longitude)||null,equipment:[]});save();render();return true;});}
 function openEquipment(clientId,propertyId){const f=el('form',{class:'form-grid'},[select('Įrangos tipas','type',['Dujinis katilas','Šilumos siurblys','Rekuperatorius','Kondicionierius','Boileris','Cirkuliacinis siurblys','Vandens filtras','Kita'],true),field('Gamintojas','manufacturer'),field('Modelis','model'),field('Serijos numeris','serialNumber','text',true),field('Sumontavimo data','installedAt','date'),field('Garantija iki','warrantyUntil','date')]);modal('Pridėti įrangą',f,()=>{const d=Object.fromEntries(new FormData(f));if(!d.model.trim()&&!d.manufacturer.trim())return alert('Įrašyk gamintoją arba modelį.');const c=state.clients.find(x=>x.id===clientId);c.properties.find(p=>p.id===propertyId).equipment.push({id:crypto.randomUUID(),...d});c.equipmentName ||= `${d.manufacturer} ${d.model}`.trim();save();render();return true;});}
-function render(){applyTheme();const content=state.view==='dashboard'?dashboard():state.view==='clients'?clients():state.view==='services'?servicesView():state.view==='properties'?properties():equipment();shell(content);}
+function renderFailure(error){
+  console.error(`Nepavyko atvaizduoti skilties "${state.view}":`,error);
+  const app=document.getElementById('app');
+  app.innerHTML='';
+  app.append(el('main',{class:'main render-fallback'},[
+    el('div',{class:'card error-card',role:'alert'},[
+      el('h1',{},'Skilties nepavyko atidaryti'),
+      el('p',{class:'muted'},'Duomenys nebuvo pakeisti. Grįžk į pagrindinį langą arba bandyk atidaryti skiltį dar kartą.'),
+      el('div',{class:'actions'},[
+        el('button',{class:'btn btn-primary',onclick:()=>{state.view='dashboard';state.selectedClientId=null;render();}},'🏠 Pagrindinis'),
+        el('button',{class:'btn',onclick:render},'Bandyti dar kartą')
+      ])
+    ])
+  ]));
+}
+function render(){
+  try{
+    applyTheme();
+    const content=state.view==='dashboard'?dashboard():state.view==='clients'?clients():state.view==='services'?servicesView():state.view==='properties'?properties():equipment();
+    shell(content);
+  }catch(error){renderFailure(error);}
+}
 ensureViewState();mergeImportedClients();migrate();if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));render();

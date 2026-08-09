@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>AirHeat regression checks</title></head><body><pre id="results">Running…</pre><iframe id="app" src="../index.html" hidden></iframe><script src="../clients-data.js"></script><script src="../domain.js"></script><script>
+(async function(){
+  const results=[],assert=(condition,name)=>{if(!condition)throw new Error(name);results.push(`PASS ${name}`);};
+  const equipmentA={id:'eq-a',manufacturer:'BAXI',model:'A'},equipmentB={id:'eq-b',manufacturer:'BAXI',model:'B'};
+  const property={id:'prop-1',address:'Test g. 1',equipment:[equipmentA,equipmentB]};
+  const customer={id:'customer-1',properties:[property],services:[
+    {id:'legacy-a',equipmentName:'BAXI A',status:'completed',date:'2020-01-01'},
+    {id:'new-a',propertyId:'prop-1',equipmentId:'eq-a',status:'completed',date:'2021-01-01'},
+    {id:'new-b',propertyId:'prop-1',equipmentId:'eq-b',status:'completed',date:'2022-01-01'}
+  ]};
+  const D=window.AirHeatDomain;
+  assert(D.resolveServiceContext(customer,customer.services[0]).e.id==='eq-a','legacy service resolves by equipment name');
+  assert(D.resolveServiceContext(customer,customer.services[1]).resolution==='explicit','new service prefers explicit ownership');
+  assert(D.servicesForEquipment(customer,property,equipmentA).map(x=>x.id).join(',')==='legacy-a,new-a','equipment A history is independent');
+  assert(D.servicesForEquipment(customer,property,equipmentB).map(x=>x.id).join(',')==='new-b','equipment B history is independent');
+  const imported=window.AIRHEAT_IMPORTED_CLIENTS,importedServices=imported.flatMap(c=>(c.services||[]).map(service=>({c,service})));
+  assert(imported.length===1095,'imported customer/installations count is preserved');
+  assert(importedServices.length===3617,'imported service count is preserved');
+  assert(importedServices.every(({c,service})=>D.resolveServiceContext(c,service)),'all imported legacy services resolve to equipment context');
+  assert(D.mapUrl({latitude:54.6872,longitude:25.2797,address:'fallback'},'Waze').includes('ll=54.6872%2C25.2797'),'Waze uses valid GPS');
+  assert(D.mapUrl({latitude:null,longitude:null,address:'Test g. 1'},'Google').includes('query=Test+g.+1'),'Maps falls back to address');
+  assert(!D.mapUrl({latitude:null,longitude:null,address:'Test g. 1'},'Waze').includes('null%2Cnull'),'navigation never emits null,null');
+  const frame=document.getElementById('app');await new Promise((resolve,reject)=>{frame.onload=resolve;setTimeout(()=>reject(new Error('app load timeout')),15000);});
+  const doc=frame.contentDocument,views=['dashboard','clients','services','properties','equipment'],buttons=[...doc.querySelectorAll('.sidebar .nav button')];
+  views.forEach((view,index)=>{buttons[index].click();assert(!doc.body.textContent.includes('Skilties nepavyko atidaryti'),`${view} renders without fallback`);});
+  document.getElementById('results').textContent=results.join('\n')+`\n\n${results.length} checks passed`;
+})().catch(error=>{document.getElementById('results').textContent=`FAIL ${error.stack||error}`;document.body.dataset.failed='true';});
+</script></body></html>

@@ -1,5 +1,5 @@
 const CACHE='airheat-v0.4.4';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./clients-data.js','./manifest.webmanifest','./icon.svg'];
+const ASSETS=['./','./index.html','./styles.css','./domain.js','./app.js','./clients-data.js','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',event=>{
   self.skipWaiting();

@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+node_modules/
+supabase/.temp/
+supabase/.branches/
+legacy-export*.json
+import-report*.json
+runtime-config.js
+dist-staging/

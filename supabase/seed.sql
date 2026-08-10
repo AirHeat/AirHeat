@@ -1,0 +1,3 @@
+-- Intentionally empty. Never seed production customer data from clients-data.js.
+-- Create the first Auth user manually, then bootstrap its public.users admin profile
+-- using the documented server-side SQL statement.

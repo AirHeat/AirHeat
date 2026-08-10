@@ -1,0 +1,14 @@
+{
+  "name": "airheat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:staging": "node scripts/build-staging.mjs",
+    "config:staging": "node scripts/generate-runtime-config.mjs",
+    "import:legacy:dry-run": "node scripts/import-legacy.mjs",
+    "verify:supabase": "node scripts/verify-supabase.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  }
+}

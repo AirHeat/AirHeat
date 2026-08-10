@@ -1,0 +1,14 @@
+project_id = "airheat"
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:4173"
+enable_signup = false
+
+[db]
+major_version = 15
